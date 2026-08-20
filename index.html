@@ -862,7 +862,10 @@
       const box = document.getElementById("templateImagePreview");
       if (!box) return;
       box.hidden = !imageSrc;
-      if (imageSrc) document.getElementById("templateImagePreviewImg").src = imageSrc;
+      if (imageSrc) {
+        document.getElementById("templateImagePreviewImg").src = imageSrc;
+        getImageBlob(imageSrc); // xử lý sẵn ảnh thành blob trước, để lúc bấm gửi copy gần như tức thì
+      }
     }
 
     function fillName(content, name) {
@@ -990,10 +993,8 @@
     }
 
     async function openZalo(phone, message, imageSrc) {
-      // Mở Zalo NGAY trong lúc bấm (cùng nhịp thao tác của người dùng) để điện thoại
-      // ưu tiên bật thẳng app Zalo thay vì rơi về web - copy nội dung làm sau mới không làm lỡ nhịp này.
-      window.open(`https://zalo.me/${normalizePhone(phone)}`, "_blank");
-
+      // Copy TRƯỚC khi mở Zalo: trình duyệt chặn ghi clipboard khi trang mất focus,
+      // mà mở Zalo (tab mới/app khác) làm mất focus ngay lập tức - nên phải copy xong rồi mới mở.
       let copiedWithImage = false;
       if (imageSrc) {
         copiedWithImage = await copyImageAndText(message, imageSrc);
@@ -1005,16 +1006,30 @@
           prompt("Copy tin nhắn này rồi dán vào Zalo:", message);
         }
       }
+      window.open(`https://zalo.me/${normalizePhone(phone)}`, "_blank");
+    }
+
+    const imageBlobCache = new Map();
+
+    function getImageBlob(imageSrc) {
+      if (!imageBlobCache.has(imageSrc)) {
+        imageBlobCache.set(imageSrc, buildImageBlob(imageSrc));
+      }
+      return imageBlobCache.get(imageSrc);
+    }
+
+    async function buildImageBlob(imageSrc) {
+      const img = await loadImage(imageSrc);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     }
 
     async function copyImageAndText(message, imageSrc) {
       try {
-        const img = await loadImage(imageSrc);
-        const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext("2d").drawImage(img, 0, 0);
-        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        const blob = await getImageBlob(imageSrc);
         if (!blob) return false;
         await navigator.clipboard.write([
           new ClipboardItem({
