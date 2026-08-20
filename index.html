@@ -286,25 +286,30 @@
 
     .cskh-image-preview {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
       margin-top: -6px;
       margin-bottom: 15px;
-      padding: 8px 10px;
-      border-radius: 8px;
-      border: 1px solid rgba(82, 128, 49, .16);
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px dashed rgba(82, 128, 49, .4);
       background: #f4faf0;
-      font-size: 12.5px;
-      color: var(--leaf);
-      font-weight: 800;
+      text-align: center;
     }
 
     .cskh-image-preview img {
-      width: 44px;
-      height: 44px;
-      border-radius: 6px;
+      max-width: 220px;
+      width: 100%;
+      border-radius: 8px;
       object-fit: cover;
-      flex-shrink: 0;
+      box-shadow: 0 6px 16px rgba(31, 78, 35, .18);
+    }
+
+    .cskh-image-preview span {
+      font-size: 13px;
+      color: var(--leaf);
+      font-weight: 850;
     }
 
     .cskh-hint {
@@ -594,7 +599,7 @@
           <label><span>✏️ Nội dung tin nhắn (có thể sửa trước khi gửi)</span><textarea name="message" id="messagePreview"></textarea></label>
           <div class="cskh-image-preview" id="templateImagePreview" hidden>
             <img id="templateImagePreviewImg" alt="Ảnh kèm mẫu ưu đãi">
-            <span>🖼️ Mẫu này sẽ copy kèm ảnh khi gửi</span>
+            <span>🖼️ Mẫu này có ảnh kèm — bấm giữ vào ảnh trên để Lưu ảnh/Copy ảnh, rồi gửi kèm qua Zalo</span>
           </div>
           <div class="cskh-actions">
             <button type="submit" class="primary">💬 Copy tin nhắn &amp; Mở Zalo</button>
@@ -603,7 +608,7 @@
           </div>
           <div class="cskh-hint">
             <span class="dot"></span>
-            <span>💡 Bấm "Copy tin nhắn &amp; Mở Zalo" sẽ tự copy tin nhắn (mẫu nào có ảnh thì copy luôn cả ảnh 🖼️) và thử mở đúng khung chat khách. Nếu Zalo báo "trang không tồn tại" (do khách tắt tìm theo số điện thoại trong cài đặt riêng tư của họ), hãy mở Zalo lên, bấm "Copy số điện thoại" ở đây rồi dán vào ô tìm kiếm bạn bè trong Zalo để tìm đúng khách, sau đó dán (Ctrl+V) để gửi cả ảnh và tin nhắn.</span>
+            <span>💡 Bấm "Copy tin nhắn &amp; Mở Zalo" sẽ tự copy tin nhắn và thử mở đúng khung chat khách. Mẫu nào có ảnh thì bấm giữ vào ảnh phía trên để Lưu/Copy ảnh riêng, rồi gửi kèm. Nếu Zalo báo "trang không tồn tại" (do khách tắt tìm theo số điện thoại trong cài đặt riêng tư của họ), hãy mở Zalo lên, bấm "Copy số điện thoại" ở đây rồi dán vào ô tìm kiếm bạn bè trong Zalo để tìm đúng khách, sau đó dán tin nhắn để gửi.</span>
           </div>
           <p id="sentNotice" class="cskh-sent"></p>
         </form>
@@ -970,11 +975,11 @@
       if (clipboardOk) {
         notice.className = "cskh-sent ok";
         notice.textContent = templateImage
-          ? "Đã copy cả ảnh và tin nhắn, mở Zalo dán vào là gửi được liền."
+          ? "Đã copy tin nhắn và mở Zalo. Nhớ bấm giữ vào ảnh phía trên để Lưu/Copy ảnh, gửi kèm cho khách."
           : "Đã copy tin nhắn và mở Zalo, dán tin nhắn để gửi cho khách.";
       } else {
         notice.className = "cskh-sent error";
-        notice.textContent = "Máy này chặn copy tự động. Tin nhắn đã được bôi đen sẵn ở ô phía trên - quay lại đây, bấm giữ vào ô đó chọn Copy, rồi qua Zalo dán.";
+        notice.textContent = "Máy này chặn copy tự động. Tin nhắn đã được bôi đen sẵn ở ô phía trên - quay lại đây, bấm giữ vào ô đó chọn Copy, rồi qua Zalo dán." + (templateImage ? " Ảnh thì bấm giữ vào ảnh phía trên để Lưu/Copy riêng." : "");
       }
     }
 
