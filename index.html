@@ -935,8 +935,8 @@
     }
 
     function isValidVietnamPhone(normalized) {
-      // Zalo/di động VN: 84 + 9 số = 11 ký tự. Cho phép thêm 12 để không chặn nhầm vài số bàn/đặc biệt.
-      return /^84\d{9,10}$/.test(normalized);
+      // Chỉ chặn khi số quá ngắn để không gõ nhầm số rác, không soi kỹ định dạng.
+      return normalized.length >= 9;
     }
 
     async function handleSend(event) {
@@ -1026,14 +1026,14 @@
           clipboardOk = false;
         }
       }
-      // Dự phòng: dù clipboard có ghi được hay không, luôn bôi đen sẵn tin nhắn trong ô
-      // để nếu Zalo dán ra trống, người dùng chỉ cần quay lại đây copy tay.
-      selectMessageText();
+      // Bôi đen tin nhắn để người dùng thấy rõ, nhưng CHỈ ghi đè clipboard bằng chữ
+      // khi copy tự động thất bại - nếu không sẽ xoá mất ảnh vừa copy thành công.
+      selectMessageText(!clipboardOk);
       window.open(`https://zalo.me/${normalizePhone(phone)}`, "_blank");
       return clipboardOk;
     }
 
-    function selectMessageText() {
+    function selectMessageText(alsoOverwriteClipboard) {
       const textarea = document.getElementById("messagePreview");
       if (!textarea) return;
       textarea.focus();
@@ -1043,6 +1043,7 @@
       } catch {
         // một số trình duyệt di động không hỗ trợ setSelectionRange trên textarea ẩn/không focus được
       }
+      if (!alsoOverwriteClipboard) return;
       try {
         document.execCommand("copy");
       } catch {
