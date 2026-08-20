@@ -1006,10 +1006,22 @@
         notice.textContent = templateImage
           ? "Đã copy tin nhắn, qua Zalo dán để gửi. Ảnh thì chuột phải/bấm giữ vào ảnh phía trên để copy riêng."
           : "Đã copy tin nhắn, qua Zalo dán để gửi.";
+        // Đã copy xong, coi như hoàn tất 1 khách - dọn form để nhập khách tiếp theo ngay.
+        clearFormForNext();
       } else {
         notice.className = "cskh-sent error";
         notice.textContent = "Máy này chặn copy tự động. Tin nhắn đã được bôi đen sẵn ở ô phía trên - bấm giữ chọn Copy." + (templateImage ? " Ảnh thì chuột phải/bấm giữ vào ảnh phía trên để copy riêng." : "");
       }
+    }
+
+    function clearFormForNext() {
+      const form = document.getElementById("sendForm");
+      form.phone.value = "";
+      form.customerName.value = "";
+      document.getElementById("templateSelect").selectedIndex = 0;
+      messageEdited = false;
+      applyTemplateToPreview();
+      form.phone.focus();
     }
 
     async function handleCopyPhone() {
