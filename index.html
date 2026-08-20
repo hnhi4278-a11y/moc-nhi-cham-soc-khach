@@ -599,16 +599,19 @@
           <label><span>✏️ Nội dung tin nhắn (có thể sửa trước khi gửi)</span><textarea name="message" id="messagePreview"></textarea></label>
           <div class="cskh-image-preview" id="templateImagePreview" hidden>
             <img id="templateImagePreviewImg" alt="Ảnh kèm mẫu ưu đãi">
-            <span>🖼️ Mẫu này có ảnh kèm — bấm giữ vào ảnh trên để Lưu ảnh/Copy ảnh, rồi gửi kèm qua Zalo</span>
+            <span>🖼️ Mẫu này có ảnh kèm - bấm "Copy tin nhắn và ảnh" bên dưới, hoặc bấm giữ vào ảnh để Lưu/Copy riêng</span>
           </div>
           <div class="cskh-actions">
-            <button type="submit" class="primary">💬 Copy tin nhắn &amp; Mở Zalo</button>
-            <button type="button" class="ghost" id="copyPhone">📋 Copy số điện thoại</button>
+            <button type="button" class="primary" id="openZaloBtn">📲 Mở Zalo</button>
+            <button type="button" class="primary" id="copyAllBtn">📋 Copy tin nhắn và ảnh</button>
+          </div>
+          <div class="cskh-actions">
+            <button type="button" class="ghost" id="copyPhone">☎️ Copy số điện thoại</button>
             <button type="button" class="ghost" id="resetMessage">🔄 Khôi phục mẫu gốc</button>
           </div>
           <div class="cskh-hint">
             <span class="dot"></span>
-            <span>💡 Bấm "Copy tin nhắn &amp; Mở Zalo" sẽ tự copy tin nhắn và thử mở đúng khung chat khách. Mẫu nào có ảnh thì bấm giữ vào ảnh phía trên để Lưu/Copy ảnh riêng, rồi gửi kèm. Nếu Zalo báo "trang không tồn tại" (do khách tắt tìm theo số điện thoại trong cài đặt riêng tư của họ), hãy mở Zalo lên, bấm "Copy số điện thoại" ở đây rồi dán vào ô tìm kiếm bạn bè trong Zalo để tìm đúng khách, sau đó dán tin nhắn để gửi.</span>
+            <span>💡 Bấm "Mở Zalo" để nhảy thẳng sang app/tìm đúng khách, rồi bấm "Copy tin nhắn và ảnh" để dán qua Zalo cho nhanh - tách 2 nút riêng để máy không bị lỡ nhịp mở app. Nếu Zalo báo "trang không tồn tại" (do khách tắt tìm theo số điện thoại), hãy mở Zalo lên, bấm "Copy số điện thoại" rồi dán vào ô tìm kiếm bạn bè trong Zalo để tìm đúng khách.</span>
           </div>
           <p id="sentNotice" class="cskh-sent"></p>
         </form>
@@ -821,7 +824,9 @@
         messageEdited = false;
         applyTemplateToPreview();
       });
-      document.getElementById("sendForm").addEventListener("submit", handleSend);
+      document.getElementById("sendForm").addEventListener("submit", (event) => event.preventDefault());
+      document.getElementById("openZaloBtn").addEventListener("click", handleOpenZalo);
+      document.getElementById("copyAllBtn").addEventListener("click", handleCopyAll);
       document.getElementById("copyPhone").addEventListener("click", handleCopyPhone);
       document.getElementById("templateForm").addEventListener("submit", handleAddTemplate);
       document.getElementById("historySearch").addEventListener("input", renderHistory);
@@ -941,10 +946,29 @@
       return normalized.length >= 9;
     }
 
-    async function handleSend(event) {
-      event.preventDefault();
-      const form = event.currentTarget;
-      const data = Object.fromEntries(new FormData(form).entries());
+    function readSendForm() {
+      const form = document.getElementById("sendForm");
+      return Object.fromEntries(new FormData(form).entries());
+    }
+
+    function logCareSent(data) {
+      const templateImage = currentTemplate()?.image || null;
+      const entry = {
+        phone: data.phone.trim(),
+        customerName: data.customerName.trim() || "Khách lẻ",
+        templateTitle: currentTemplate()?.title || "-",
+        message: data.message.trim(),
+        image: templateImage,
+        createdAt: new Date().toISOString(),
+      };
+      history.unshift(entry);
+      saveHistory();
+      renderHistory();
+      pushCloudHistory(entry);
+    }
+
+    function handleOpenZalo() {
+      const data = readSendForm();
       const phone = normalizePhone(data.phone);
       const notice = document.getElementById("sentNotice");
       if (!isValidVietnamPhone(phone)) {
@@ -953,30 +977,43 @@
         notice.textContent = "Số điện thoại còn thiếu số, kiểm tra lại.";
         return;
       }
+      // Mở NGAY khi bấm (không await gì trước đó) để điện thoại chịu nhảy thẳng sang app.
+      window.open(`https://zalo.me/${phone}`, "_blank");
+      logCareSent(data);
+      notice.hidden = false;
+      notice.className = "cskh-sent ok";
+      notice.textContent = "Đã mở Zalo. Bấm nút \"Copy tin nhắn và ảnh\" bên cạnh rồi qua Zalo dán.";
+    }
+
+    async function handleCopyAll() {
+      const data = readSendForm();
       const message = data.message.trim();
       const templateImage = currentTemplate()?.image || null;
-      const clipboardOk = await openZalo(phone, message);
-      const entry = {
-        phone: data.phone.trim(),
-        customerName: data.customerName.trim() || "Khách lẻ",
-        templateTitle: currentTemplate()?.title || "-",
-        message,
-        image: templateImage,
-        createdAt: new Date().toISOString(),
-      };
-      history.unshift(entry);
-      saveHistory();
-      renderHistory();
-      pushCloudHistory(entry);
+      const notice = document.getElementById("sentNotice");
+
+      let clipboardOk = false;
+      if (templateImage) {
+        clipboardOk = await copyImageAndText(message, templateImage);
+      }
+      if (!clipboardOk) {
+        try {
+          await navigator.clipboard.writeText(message);
+          clipboardOk = true;
+        } catch {
+          clipboardOk = false;
+        }
+      }
+      selectMessageText(!clipboardOk);
+
       notice.hidden = false;
       if (clipboardOk) {
         notice.className = "cskh-sent ok";
         notice.textContent = templateImage
-          ? "Đã copy tin nhắn và mở Zalo. Nhớ bấm giữ vào ảnh phía trên để Lưu/Copy ảnh, gửi kèm cho khách."
-          : "Đã copy tin nhắn và mở Zalo, dán tin nhắn để gửi cho khách.";
+          ? "Đã copy cả tin nhắn và ảnh, qua Zalo dán là gửi được liền."
+          : "Đã copy tin nhắn, qua Zalo dán để gửi.";
       } else {
         notice.className = "cskh-sent error";
-        notice.textContent = "Máy này chặn copy tự động. Tin nhắn đã được bôi đen sẵn ở ô phía trên - quay lại đây, bấm giữ vào ô đó chọn Copy, rồi qua Zalo dán." + (templateImage ? " Ảnh thì bấm giữ vào ảnh phía trên để Lưu/Copy riêng." : "");
+        notice.textContent = "Máy này chặn copy tự động. Tin nhắn đã được bôi đen sẵn ở ô phía trên - bấm giữ chọn Copy." + (templateImage ? " Ảnh thì bấm giữ vào ảnh phía trên để Lưu/Copy riêng." : "");
       }
     }
 
@@ -1046,6 +1083,22 @@
         document.execCommand("copy");
       } catch {
         // execCommand đã lỗi thời, chỉ dùng như phương án dự phòng thêm
+      }
+    }
+
+    async function copyImageAndText(message, imageSrc) {
+      try {
+        const response = await fetch(imageSrc);
+        const blob = await response.blob();
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            [blob.type || "image/jpeg"]: blob,
+            "text/plain": new Blob([message], { type: "text/plain" }),
+          }),
+        ]);
+        return true;
+      } catch {
+        return false;
       }
     }
 
