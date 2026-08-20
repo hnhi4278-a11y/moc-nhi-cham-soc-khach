@@ -599,11 +599,11 @@
           <label><span>✏️ Nội dung tin nhắn (có thể sửa trước khi gửi)</span><textarea name="message" id="messagePreview"></textarea></label>
           <div class="cskh-image-preview" id="templateImagePreview" hidden>
             <img id="templateImagePreviewImg" alt="Ảnh kèm mẫu ưu đãi">
-            <span>🖼️ Mẫu này có ảnh kèm - bấm "Copy tin nhắn và ảnh" bên dưới, hoặc bấm giữ vào ảnh để Lưu/Copy riêng</span>
+            <span>🖼️ Mẫu này có ảnh kèm - chuột phải (máy tính) hoặc bấm giữ (điện thoại) vào ảnh trên → Copy Image / Lưu ảnh, rồi gửi kèm qua Zalo</span>
           </div>
           <div class="cskh-actions">
             <button type="button" class="primary" id="openZaloBtn">📲 Mở Zalo</button>
-            <button type="button" class="primary" id="copyAllBtn">📋 Copy tin nhắn và ảnh</button>
+            <button type="button" class="primary" id="copyAllBtn">📋 Copy tin nhắn</button>
           </div>
           <div class="cskh-actions">
             <button type="button" class="ghost" id="copyPhone">☎️ Copy số điện thoại</button>
@@ -611,7 +611,7 @@
           </div>
           <div class="cskh-hint">
             <span class="dot"></span>
-            <span>💡 Bấm "Mở Zalo" để nhảy thẳng sang app/tìm đúng khách, rồi bấm "Copy tin nhắn và ảnh" để dán qua Zalo cho nhanh - tách 2 nút riêng để máy không bị lỡ nhịp mở app. Nếu Zalo báo "trang không tồn tại" (do khách tắt tìm theo số điện thoại), hãy mở Zalo lên, bấm "Copy số điện thoại" rồi dán vào ô tìm kiếm bạn bè trong Zalo để tìm đúng khách.</span>
+            <span>💡 Bấm "Mở Zalo" để nhảy thẳng sang app/tìm đúng khách, rồi bấm "Copy tin nhắn" để dán qua Zalo cho nhanh. Ảnh (nếu mẫu có) thì copy riêng bằng chuột phải/bấm giữ vào ảnh - cách này chắc chắn, không phụ thuộc trình duyệt. Nếu Zalo báo "trang không tồn tại" (do khách tắt tìm theo số điện thoại), hãy mở Zalo lên, bấm "Copy số điện thoại" rồi dán vào ô tìm kiếm bạn bè trong Zalo để tìm đúng khách.</span>
           </div>
           <p id="sentNotice" class="cskh-sent"></p>
         </form>
@@ -992,16 +992,11 @@
       const notice = document.getElementById("sentNotice");
 
       let clipboardOk = false;
-      if (templateImage) {
-        clipboardOk = await copyImageAndText(message, templateImage);
-      }
-      if (!clipboardOk) {
-        try {
-          await navigator.clipboard.writeText(message);
-          clipboardOk = true;
-        } catch {
-          clipboardOk = false;
-        }
+      try {
+        await navigator.clipboard.writeText(message);
+        clipboardOk = true;
+      } catch {
+        clipboardOk = false;
       }
       selectMessageText(!clipboardOk);
 
@@ -1009,11 +1004,11 @@
       if (clipboardOk) {
         notice.className = "cskh-sent ok";
         notice.textContent = templateImage
-          ? "Đã copy cả tin nhắn và ảnh, qua Zalo dán là gửi được liền."
+          ? "Đã copy tin nhắn, qua Zalo dán để gửi. Ảnh thì chuột phải/bấm giữ vào ảnh phía trên để copy riêng."
           : "Đã copy tin nhắn, qua Zalo dán để gửi.";
       } else {
         notice.className = "cskh-sent error";
-        notice.textContent = "Máy này chặn copy tự động. Tin nhắn đã được bôi đen sẵn ở ô phía trên - bấm giữ chọn Copy." + (templateImage ? " Ảnh thì bấm giữ vào ảnh phía trên để Lưu/Copy riêng." : "");
+        notice.textContent = "Máy này chặn copy tự động. Tin nhắn đã được bôi đen sẵn ở ô phía trên - bấm giữ chọn Copy." + (templateImage ? " Ảnh thì chuột phải/bấm giữ vào ảnh phía trên để copy riêng." : "");
       }
     }
 
@@ -1083,22 +1078,6 @@
         document.execCommand("copy");
       } catch {
         // execCommand đã lỗi thời, chỉ dùng như phương án dự phòng thêm
-      }
-    }
-
-    async function copyImageAndText(message, imageSrc) {
-      try {
-        const response = await fetch(imageSrc);
-        const blob = await response.blob();
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            [blob.type || "image/jpeg"]: blob,
-            "text/plain": new Blob([message], { type: "text/plain" }),
-          }),
-        ]);
-        return true;
-      } catch {
-        return false;
       }
     }
 
