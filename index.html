@@ -953,7 +953,7 @@
       }
       const message = data.message.trim();
       const templateImage = currentTemplate()?.image || null;
-      await openZalo(phone, message, templateImage);
+      const clipboardOk = await openZalo(phone, message, templateImage);
       const entry = {
         phone: data.phone.trim(),
         customerName: data.customerName.trim() || "Khách lẻ",
@@ -967,10 +967,15 @@
       renderHistory();
       pushCloudHistory(entry);
       notice.hidden = false;
-      notice.className = "cskh-sent ok";
-      notice.textContent = templateImage
-        ? "Đã copy cả ảnh và tin nhắn, mở Zalo dán vào là gửi được liền."
-        : "Đã copy tin nhắn và mở Zalo, dán tin nhắn để gửi cho khách.";
+      if (clipboardOk) {
+        notice.className = "cskh-sent ok";
+        notice.textContent = templateImage
+          ? "Đã copy cả ảnh và tin nhắn, mở Zalo dán vào là gửi được liền."
+          : "Đã copy tin nhắn và mở Zalo, dán tin nhắn để gửi cho khách.";
+      } else {
+        notice.className = "cskh-sent error";
+        notice.textContent = "Máy này chặn copy tự động. Tin nhắn đã được bôi đen sẵn ở ô phía trên - quay lại đây, bấm giữ vào ô đó chọn Copy, rồi qua Zalo dán.";
+      }
     }
 
     async function handleCopyPhone() {
@@ -982,31 +987,67 @@
         notice.textContent = "Nhập số điện thoại khách trước đã.";
         return;
       }
+      let clipboardOk = true;
       try {
         await navigator.clipboard.writeText(phone);
       } catch {
-        prompt("Copy số điện thoại này:", phone);
+        clipboardOk = false;
+      }
+      const phoneInput = document.getElementById("sendForm").phone;
+      phoneInput.focus();
+      phoneInput.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        // execCommand đã lỗi thời, chỉ dùng như phương án dự phòng thêm
       }
       notice.hidden = false;
-      notice.className = "cskh-sent ok";
-      notice.textContent = "Đã copy số điện thoại, mở Zalo và dán vào ô tìm kiếm bạn bè.";
+      if (clipboardOk) {
+        notice.className = "cskh-sent ok";
+        notice.textContent = "Đã copy số điện thoại, mở Zalo và dán vào ô tìm kiếm bạn bè.";
+      } else {
+        notice.className = "cskh-sent error";
+        notice.textContent = "Máy này chặn copy tự động. Số điện thoại đã được bôi đen sẵn ở ô phía trên - quay lại đây, bấm giữ chọn Copy.";
+      }
     }
 
     async function openZalo(phone, message, imageSrc) {
       // Copy TRƯỚC khi mở Zalo: trình duyệt chặn ghi clipboard khi trang mất focus,
       // mà mở Zalo (tab mới/app khác) làm mất focus ngay lập tức - nên phải copy xong rồi mới mở.
-      let copiedWithImage = false;
+      let clipboardOk = false;
       if (imageSrc) {
-        copiedWithImage = await copyImageAndText(message, imageSrc);
+        clipboardOk = await copyImageAndText(message, imageSrc);
       }
-      if (!copiedWithImage) {
+      if (!clipboardOk) {
         try {
           await navigator.clipboard.writeText(message);
+          clipboardOk = true;
         } catch {
-          prompt("Copy tin nhắn này rồi dán vào Zalo:", message);
+          clipboardOk = false;
         }
       }
+      // Dự phòng: dù clipboard có ghi được hay không, luôn bôi đen sẵn tin nhắn trong ô
+      // để nếu Zalo dán ra trống, người dùng chỉ cần quay lại đây copy tay.
+      selectMessageText();
       window.open(`https://zalo.me/${normalizePhone(phone)}`, "_blank");
+      return clipboardOk;
+    }
+
+    function selectMessageText() {
+      const textarea = document.getElementById("messagePreview");
+      if (!textarea) return;
+      textarea.focus();
+      textarea.select();
+      try {
+        textarea.setSelectionRange(0, textarea.value.length);
+      } catch {
+        // một số trình duyệt di động không hỗ trợ setSelectionRange trên textarea ẩn/không focus được
+      }
+      try {
+        document.execCommand("copy");
+      } catch {
+        // execCommand đã lỗi thời, chỉ dùng như phương án dự phòng thêm
+      }
     }
 
     const imageBlobCache = new Map();
