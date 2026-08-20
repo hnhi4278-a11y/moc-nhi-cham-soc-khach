@@ -840,7 +840,7 @@
         const resendAt = event.target.closest("[data-resend]")?.dataset.resend;
         if (resendAt) {
           const item = history.find((row) => row.createdAt === resendAt);
-          if (item) openZalo(item.phone, item.message, item.image);
+          if (item) openZalo(item.phone, item.message);
         }
 
         const deleteHistoryAt = event.target.closest("[data-delete-history]")?.dataset.deleteHistory;
@@ -867,10 +867,7 @@
       const box = document.getElementById("templateImagePreview");
       if (!box) return;
       box.hidden = !imageSrc;
-      if (imageSrc) {
-        document.getElementById("templateImagePreviewImg").src = imageSrc;
-        getImageBlob(imageSrc); // xử lý sẵn ảnh thành blob trước, để lúc bấm gửi copy gần như tức thì
-      }
+      if (imageSrc) document.getElementById("templateImagePreviewImg").src = imageSrc;
     }
 
     function fillName(content, name) {
@@ -953,12 +950,12 @@
       if (!isValidVietnamPhone(phone)) {
         notice.hidden = false;
         notice.className = "cskh-sent error";
-        notice.textContent = "Số điện thoại chưa đúng định dạng VN (10 số, bắt đầu bằng 0), kiểm tra lại.";
+        notice.textContent = "Số điện thoại còn thiếu số, kiểm tra lại.";
         return;
       }
       const message = data.message.trim();
       const templateImage = currentTemplate()?.image || null;
-      const clipboardOk = await openZalo(phone, message, templateImage);
+      const clipboardOk = await openZalo(phone, message);
       const entry = {
         phone: data.phone.trim(),
         customerName: data.customerName.trim() || "Khách lẻ",
@@ -1016,25 +1013,21 @@
       }
     }
 
-    async function openZalo(phone, message, imageSrc) {
-      // Copy TRƯỚC khi mở Zalo: trình duyệt chặn ghi clipboard khi trang mất focus,
-      // mà mở Zalo (tab mới/app khác) làm mất focus ngay lập tức - nên phải copy xong rồi mới mở.
-      let clipboardOk = false;
-      if (imageSrc) {
-        clipboardOk = await copyImageAndText(message, imageSrc);
-      }
-      if (!clipboardOk) {
-        try {
-          await navigator.clipboard.writeText(message);
-          clipboardOk = true;
-        } catch {
-          clipboardOk = false;
-        }
-      }
-      // Bôi đen tin nhắn để người dùng thấy rõ, nhưng CHỈ ghi đè clipboard bằng chữ
-      // khi copy tự động thất bại - nếu không sẽ xoá mất ảnh vừa copy thành công.
-      selectMessageText(!clipboardOk);
+    async function openZalo(phone, message) {
+      // Mở Zalo NGAY khi bấm (cùng nhịp thao tác) để điện thoại chịu nhảy thẳng sang app -
+      // nếu chờ copy xong mới mở thì điện thoại không còn coi đây là thao tác trực tiếp của người dùng nữa.
       window.open(`https://zalo.me/${normalizePhone(phone)}`, "_blank");
+
+      let clipboardOk = false;
+      try {
+        await navigator.clipboard.writeText(message);
+        clipboardOk = true;
+      } catch {
+        clipboardOk = false;
+      }
+      // Luôn bôi đen tin nhắn trong ô: nếu clipboard tự động không ăn (do vừa mất focus khi mở Zalo),
+      // quay lại tab này vẫn copy tay được ngay, không cần gõ lại.
+      selectMessageText(!clipboardOk);
       return clipboardOk;
     }
 
@@ -1054,49 +1047,6 @@
       } catch {
         // execCommand đã lỗi thời, chỉ dùng như phương án dự phòng thêm
       }
-    }
-
-    const imageBlobCache = new Map();
-
-    function getImageBlob(imageSrc) {
-      if (!imageBlobCache.has(imageSrc)) {
-        imageBlobCache.set(imageSrc, buildImageBlob(imageSrc));
-      }
-      return imageBlobCache.get(imageSrc);
-    }
-
-    async function buildImageBlob(imageSrc) {
-      const img = await loadImage(imageSrc);
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      canvas.getContext("2d").drawImage(img, 0, 0);
-      return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-    }
-
-    async function copyImageAndText(message, imageSrc) {
-      try {
-        const blob = await getImageBlob(imageSrc);
-        if (!blob) return false;
-        await navigator.clipboard.write([
-          new ClipboardItem({
-            "image/png": blob,
-            "text/plain": new Blob([message], { type: "text/plain" }),
-          }),
-        ]);
-        return true;
-      } catch {
-        return false;
-      }
-    }
-
-    function loadImage(src) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = src;
-      });
     }
 
     /* ---------- Lịch sử ---------- */
