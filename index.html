@@ -553,6 +553,17 @@
       font-size: 13px;
     }
 
+    #revenueStat {
+      display: block;
+      margin-top: 2px;
+    }
+
+    .history-revenue {
+      color: var(--leaf);
+      font-weight: 800;
+      font-size: 12px;
+    }
+
     .empty-state {
       color: var(--muted);
       font-size: 13px;
@@ -595,6 +606,7 @@
         <form id="sendForm" class="cskh-form">
           <label><span>📱 Số điện thoại khách</span><input name="phone" required inputmode="tel" placeholder="09xxxxxxxx"></label>
           <label><span>🙋 Tên khách (không bắt buộc)</span><input name="customerName" placeholder="Ví dụ: Chị Linh"></label>
+          <label><span>💰 Doanh thu khách này (không bắt buộc)</span><input name="revenue" inputmode="numeric" placeholder="Ví dụ: 350000 hoặc 350k"></label>
           <label><span>✨ Chọn mẫu ưu đãi</span><select name="templateId" id="templateSelect"></select></label>
           <label><span>✏️ Nội dung tin nhắn (có thể sửa trước khi gửi)</span><textarea name="message" id="messagePreview"></textarea></label>
           <div class="cskh-image-preview" id="templateImagePreview" hidden>
@@ -622,6 +634,7 @@
           <div>
             <h2>📨 Đã gửi gần đây</h2>
             <span class="history-stat" id="todayCareCount">Hôm nay: 0</span>
+            <span class="history-stat" id="revenueStat"></span>
           </div>
           <button type="button" class="ghost" id="clearHistory">🗑️ Xoá lịch sử</button>
         </div>
@@ -959,12 +972,39 @@
         templateTitle: currentTemplate()?.title || "-",
         message: data.message.trim(),
         image: templateImage,
+        revenue: parseRevenue(data.revenue),
         createdAt: new Date().toISOString(),
       };
       history.unshift(entry);
       saveHistory();
       renderHistory();
       pushCloudHistory(entry);
+    }
+
+    /* ---------- Doanh thu ---------- */
+
+    // Nhận "350000", "350.000", "350k", "1,2tr" -> số đồng. Bỏ trống/không hợp lệ -> 0.
+    function parseRevenue(raw) {
+      const text = String(raw || "").trim().toLowerCase().replace(/\s/g, "");
+      if (!text) return 0;
+      const unit = /(tr|m)$/.test(text) ? 1000000 : /k$/.test(text) ? 1000 : 1;
+      const numberPart = text.replace(/(tr|m|k|đ|d|vnd)$/g, "");
+      const value = unit === 1
+        ? Number(numberPart.replace(/[^\d]/g, ""))
+        : Number(numberPart.replace(",", ".").replace(/[^\d.]/g, "")) * unit;
+      return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+    }
+
+    function formatMoney(value) {
+      return `${Math.round(value || 0).toLocaleString("vi-VN")}đ`;
+    }
+
+    // DT/khách = tổng doanh thu / số khách (đếm theo số điện thoại) có ghi doanh thu.
+    function revenueSummary(items) {
+      const withRevenue = items.filter((item) => Number(item.revenue) > 0);
+      const total = withRevenue.reduce((sum, item) => sum + Number(item.revenue), 0);
+      const customers = new Set(withRevenue.map((item) => normalizePhone(item.phone) || item.phone)).size;
+      return { total, customers, perCustomer: customers ? total / customers : 0 };
     }
 
     function handleOpenZalo() {
@@ -1018,6 +1058,7 @@
       const form = document.getElementById("sendForm");
       form.phone.value = "";
       form.customerName.value = "";
+      form.revenue.value = "";
       document.getElementById("templateSelect").selectedIndex = 0;
       messageEdited = false;
       applyTemplateToPreview();
@@ -1113,6 +1154,16 @@
       const countLabel = document.getElementById("todayCareCount");
       if (countLabel) countLabel.textContent = `Hôm nay: ${sentToday}`;
 
+      const revenueLabel = document.getElementById("revenueStat");
+      if (revenueLabel) {
+        const scope = keyword ? filtered : history.filter((item) => item.createdAt.slice(0, 10) === todayKey);
+        const sum = revenueSummary(scope);
+        const prefix = keyword ? "Kết quả tìm" : "Hôm nay";
+        revenueLabel.textContent = sum.total
+          ? `💰 ${prefix}: DT ${formatMoney(sum.total)} · ${sum.customers} khách · DT/khách ${formatMoney(sum.perCustomer)}`
+          : `💰 ${prefix}: chưa ghi doanh thu`;
+      }
+
       if (!filtered.length) {
         document.getElementById("historyRows").innerHTML = `<div class="empty-state">${keyword ? "🔍 Không tìm thấy khách phù hợp." : "🌱 Chưa gửi ưu đãi nào."}</div>`;
         return;
@@ -1124,6 +1175,7 @@
             <strong>${item.customerName}</strong>
             <small>${item.phone}</small>
             <span class="history-tag">${item.templateTitle}</span>
+            ${Number(item.revenue) > 0 ? `<span class="history-revenue">💰 ${formatMoney(item.revenue)}</span>` : ""}
           </div>
           <div class="history-side">
             <time>${new Date(item.createdAt).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" })}</time>
