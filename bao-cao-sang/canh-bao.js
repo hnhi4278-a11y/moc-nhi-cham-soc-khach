@@ -4,7 +4,8 @@
  */
 (function () {
   'use strict';
-  var SALONS = [{ id: 22, ten: '927 HG' }, { id: 208, ten: '671 QL50' }];
+  // Salon: tự lấy mọi salon tài khoản được xem (máy chủ đã lọc theo quyền). Muốn giới hạn: điền mã, vd [22, 208].
+  var CHI_SALON = [];
   var NGUONG_SALE = 0.7;   // UDN/MP/Topup/Book hôm qua < 70% mức TB 14 ngày của chính người đó → ⚠️
   var NGUONG_BOOK = 0.8;   // tỉ lệ khách book được phục vụ < 80% (salon)
   var SO_NGAY = 14;
@@ -79,7 +80,8 @@
     daily(S, 'sale-topup-mua'),
     daily(C, 'clsalon-book-stylist'),
     daily(C, 'clsalon-book-skinner'),
-    get(C + 'clsalon-book-salon/clsalon-book-salon-' + HQ + '.json')
+    get(C + 'clsalon-book-salon/clsalon-book-salon-' + HQ + '.json'),
+    firstOk(['/dim/dim-salon.json'])
   ]).then(function (res) {
     if (het) { txt.textContent = '❌ Phiên đăng nhập báo cáo đã hết. Tải lại trang, đăng nhập 30Shine rồi bấm dấu trang lại.'; return; }
     var info = {}, idByName = {};
@@ -92,6 +94,15 @@
     var udnType = {};
     res[2].forEach(function (r) { if (nfc(r.Nganh_hang) === '3.DV_UND') udnType[nfc(r.Type_new)] = 1; });
     var cat = res[3], topDays = res[4], bkSt = res[5], bkSk = res[6], bookSalon = res[7] || [];
+    var tenSalon = {};
+    (res[8] || []).forEach(function (r) { var id = r.salon_id != null ? r.salon_id : r.Salon_ID; if (id != null) tenSalon[id] = r.salon_name || r.Salon_name; });
+    var ids = {};
+    cat.forEach(function (x) { x.rows.forEach(function (r) { var i = sid(r); if (isFinite(i)) { ids[i] = 1; if (!tenSalon[i] && r.Salon_name) tenSalon[i] = r.Salon_name; } }); });
+    var SALONS = Object.keys(ids).map(Number)
+      .filter(function (i) { return !CHI_SALON.length || CHI_SALON.indexOf(i) >= 0; })
+      .map(function (i) { return { id: i, ten: tenSalon[i] || ('Salon ' + i) }; })
+      .sort(function (a, b) { return String(a.ten).localeCompare(String(b.ten), 'vi', { numeric: true }); });
+    if (!SALONS.length) { txt.textContent = '⚠️ Không có số salon nào cho tài khoản này trong ' + SO_NGAY + ' ngày qua.'; return; }
     var d0 = new Date(HQ + 'T00:00:00');
     var L = ['Năng suất & cảnh báo – ' + THU[d0.getDay()] + ' ' + pad(d0.getDate()) + '/' + pad(d0.getMonth() + 1) + '/' + d0.getFullYear(),
       '(⚠️ = dưới ' + pct(NGUONG_SALE) + ' mức TB ' + SO_NGAY + ' ngày của chính người đó)', ''];
