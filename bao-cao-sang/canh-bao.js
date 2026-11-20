@@ -6,6 +6,9 @@
   'use strict';
   // Salon: tự lấy mọi salon tài khoản được xem (máy chủ đã lọc theo quyền). Muốn giới hạn: điền mã, vd [22, 208].
   var CHI_SALON = [];
+  // Tên nhân viên mới mà danh sách của báo cáo chưa có (chỉ dùng khi báo cáo thiếu tên)
+  var TEN_THEM = { 31810: 'Nguyễn Tuyết Vân', 21590: 'Võ Thành Ngọc Anh', 21607: 'Phó Nguyễn Thanh Thanh',
+    21439: 'Hồ Văn Dư', 21432: 'Ngần Đức An' };
   var NGUONG_SALE = 0.7;   // UDN/MP/Topup/Book hôm qua < 70% mức TB 14 ngày của chính người đó → ⚠️
   var NGUONG_BOOK = 0.8;   // tỉ lệ khách book được phục vụ < 80% (salon)
   var SO_NGAY = 14;
@@ -91,6 +94,7 @@
       if (!info[id]) info[id] = { n: nfc(r.staff_name), p: nfc(r.staff_position) };
       idByName[nfc(r.staff_name).toLowerCase()] = id;
     });
+    Object.keys(TEN_THEM).forEach(function (id) { if (!info[id]) info[id] = { n: TEN_THEM[id], p: '' }; });
     var udnType = {};
     res[2].forEach(function (r) { if (nfc(r.Nganh_hang) === '3.DV_UND') udnType[nfc(r.Type_new)] = 1; });
     var cat = res[3], topDays = res[4], bkSt = res[5], bkSk = res[6], bookSalon = res[7] || [];
