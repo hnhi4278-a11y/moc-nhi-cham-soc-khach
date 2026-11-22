@@ -188,6 +188,20 @@
         if (vang.length) L.push('  (không có số hôm qua – nghỉ hoặc làm salon khác: ' + vang.join(', ') + ')');
       });
 
+      // ---- Ghi nhận: ai có MP / UDN / Topup hôm qua ----
+      var gn = { mp: [], udn: [], topup: [] };
+      Object.keys(nv).forEach(function (id) {
+        var h = nv[id].d[HQ]; if (!h) return;
+        var nm = info[id] ? info[id].n : ('Mã ' + id);
+        ['mp', 'udn', 'topup'].forEach(function (k) { if (h[k] > 0) gn[k].push({ nm: nm, v: h[k] }); });
+      });
+      if (gn.mp.length || gn.udn.length || gn.topup.length) {
+        L.push('🌟 Ghi nhận');
+        [['mp', 'MP'], ['udn', 'UDN'], ['topup', 'Topup']].forEach(function (k) {
+          var ds = gn[k[0]].sort(function (a, b) { return b.v - a.v; });
+          if (ds.length) L.push('  • ' + k[1] + ': ' + ds.map(function (x) { return x.nm + ' ' + fk(x.v); }).join(', '));
+        });
+      }
       var b = bookSalon.filter(function (r) { return sid(r) === sal.id; }), tong = 0, den = 0;
       b.forEach(function (r) { var sl = num(r.sl_CusBook_day); tong += sl; if (num(r.count_sty_skin) !== 0) den += sl; });
       if (tong) {
