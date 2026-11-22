@@ -46,11 +46,12 @@
   function unwrap(j) { return Array.isArray(j) ? j : (j && j.data) || []; }
   function sid(r) { var v = r.Salon_ID != null ? r.Salon_ID : (r.SalonId != null ? r.SalonId : r.salon_ID); return Number(v); }
 
-  var het = false;
+  var het = false, capNhat = '';
   function get(url) {
     return fetch(url, { credentials: 'same-origin', cache: 'no-store' }).then(function (r) {
       if (r.status === 401 || r.status === 403) { het = true; return []; }
       if (!r.ok) return null;
+      if (url.indexOf(HQ + '.json') >= 0 && !capNhat) capNhat = r.headers.get('Last-Modified') || '';
       return r.text().then(function (t) { return t ? unwrap(JSON.parse(t)) : []; });
     }).catch(function () { return null; });
   }
@@ -60,9 +61,13 @@
     return next();
   }
 
-  // Ngày báo cáo: hôm qua theo giờ máy (VN)
+  // Ngày xem: 0 = hôm nay (số đến lúc báo cáo cập nhật), 1 = hôm qua
   var now = new Date();
-  var hq = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  var chon = prompt('Xem ngày nào? 0 = hôm nay (đến giờ báo cáo cập nhật), 1 = hôm qua', '0');
+  if (chon === null) { box.remove(); return; }
+  var lui = parseInt(chon, 10) || 0;
+  var laHomNay = lui === 0;
+  var hq = new Date(now.getFullYear(), now.getMonth(), now.getDate() - lui);
   var ngay = [];
   for (var k = SO_NGAY; k >= 0; k--) ngay.push(iso(new Date(hq.getFullYear(), hq.getMonth(), hq.getDate() - k)));
   var HQ = iso(hq);
@@ -115,8 +120,11 @@
       .sort(function (a, b) { return String(a.ten).localeCompare(String(b.ten), 'vi', { numeric: true }); });
     if (!SALONS.length) { txt.textContent = '⚠️ Không có số salon nào cho tài khoản này trong ' + SO_NGAY + ' ngày qua.'; return; }
     var d0 = new Date(HQ + 'T00:00:00');
-    var L = ['Năng suất & cảnh báo – ' + THU[d0.getDay()] + ' ' + pad(d0.getDate()) + '/' + pad(d0.getMonth() + 1) + '/' + d0.getFullYear(),
-      '(⚠️ = dưới ' + pct(NGUONG_SALE) + ' mức TB ' + SO_NGAY + ' ngày của chính người đó)', ''];
+    var gio = '';
+    if (capNhat) { var dm = new Date(capNhat); if (!isNaN(dm)) gio = pad(dm.getHours()) + 'h' + pad(dm.getMinutes()) + ' ' + pad(dm.getDate()) + '/' + pad(dm.getMonth() + 1); }
+    var L = [(laHomNay ? 'Năng suất HÔM NAY – ' : 'Năng suất & cảnh báo – ') + THU[d0.getDay()] + ' ' + pad(d0.getDate()) + '/' + pad(d0.getMonth() + 1) + '/' + d0.getFullYear(),
+      gio ? 'Số liệu cập nhật lúc ' + gio : 'Chưa biết giờ cập nhật số liệu',
+      laHomNay ? '(Hôm nay chưa hết ngày nên không so mức TB)' : '(⚠️ = dưới ' + pct(NGUONG_SALE) + ' mức TB ' + SO_NGAY + ' ngày của chính người đó)', ''];
 
     SALONS.forEach(function (sal) {
       // nv[id] = {role, d: {iso: {udn, mp, topup, book}}}
@@ -164,7 +172,7 @@
         var nhan = { udn: 'UDN', mp: 'MP', topup: 'Topup', book: 'Book' }, canh = [];
         var parts = keys.map(function (key) {
           var tb = truoc.length >= 3 ? truoc.reduce(function (s, d) { return s + o.d[d][key]; }, 0) / truoc.length : 0;
-          var low = tb > 0 && h[key] / tb < NGUONG_SALE;
+          var low = !laHomNay && tb > 0 && h[key] / tb < NGUONG_SALE;
           if (low) canh.push(nhan[key] + ' ' + pct(h[key] / tb));
           return nhan[key] + ' ' + (key === 'book' ? h[key] : fk(h[key])) + (low ? '⚠️' : '');
         });
@@ -185,7 +193,7 @@
         L.push(g[1]);
         if (!rows.length) L.push('(không có số)');
         rows.forEach(function (r) { L.push(r.s); });
-        if (vang.length) L.push('  (không có số hôm qua – nghỉ hoặc làm salon khác: ' + vang.join(', ') + ')');
+        if (vang.length && !laHomNay) L.push('  (không có số hôm qua – nghỉ hoặc làm salon khác: ' + vang.join(', ') + ')');
       });
 
       // ---- Ghi nhận: ai có MP / UDN / Topup hôm qua ----
