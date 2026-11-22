@@ -103,6 +103,7 @@
     res[2].forEach(function (r) { if (nfc(r.Nganh_hang) === '3.DV_UND') udnType[nfc(r.Type_new)] = 1; });
     var cat = res[3], topDays = res[4], bkSt = res[5], bkSk = res[6], bookSalon = res[7] || [];
     var staffDay = res[9] || [], ratSalon = res[10] || [], ratRaw = res[11] || [];
+    var daInCot = false;
     function soSalon(t) { var m = String(t || '').match(/^\s*(\d+)/); return m ? m[1] : nfc(t).toLowerCase(); }
     var tenSalon = {};
     (res[8] || []).forEach(function (r) { var id = r.salon_id != null ? r.salon_id : r.Salon_ID; if (id != null) tenSalon[id] = r.salon_name || r.Salon_name; });
@@ -214,8 +215,15 @@
         xau.forEach(function (r) {
           var nguoi = [];
           Object.keys(r).forEach(function (k) {
-            if (/(stylist|skinner|staff).*(name|ten)|(name|ten).*(stylist|skinner|staff)/i.test(k) && r[k] && isNaN(r[k])) nguoi.push(nfc(r[k]));
+            var v = r[k];
+            if (!v || typeof v !== 'string' || !isNaN(v) || /salon|fb|tag|cate|detail|date|ngay|source|khach|customer/i.test(k)) return;
+            if (/stylist|skinner|staff|nhan_?vien|nhansu|^st_|^sk_|name|ten/i.test(k)) {
+              var t = nfc(v);
+              var id = idByName[t.toLowerCase()];
+              nguoi.push(t + (id != null && info[id] && info[id].p ? ' (' + info[id].p + ')' : ''));
+            }
           });
+          if (!nguoi.length && !daInCot) { daInCot = true; L.push('  (chưa nhận ra cột tên nhân sự – các cột: ' + Object.keys(r).join(', ') + ')'); }
           var tag = nfc(r.Category_FB_name || r.FB_name), fb = nfc(r.FB_detail);
           L.push('  • ' + num(r.rating) + '⭐' + (nguoi.length ? ' – ' + nguoi.join(', ') : '') +
             (tag ? ' – ' + tag : '') + (fb ? ' – "' + fb.slice(0, 80) + '"' : ''));
