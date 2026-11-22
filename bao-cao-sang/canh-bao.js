@@ -8,11 +8,12 @@
   var CHI_SALON = [];
   // Tên nhân viên mới mà danh sách của báo cáo chưa có (chỉ dùng khi báo cáo thiếu tên)
   var TEN_THEM = { 31810: ['Nguyễn Tuyết Vân', 'Skinner'], 21590: ['Võ Thành Ngọc Anh', 'Skinner'],
-    21607: ['Phó Nguyễn Thanh Thanh', 'Skinner'], 21439: ['Hồ Văn Dư', 'Stylist'], 21432: ['Ngần Đức An', 'Stylist'] };
+    21607: ['Phó Nguyễn Thanh Thanh', 'Skinner'], 21439: ['Hồ Văn Dư', 'Stylist'], 21432: ['Ngần Đức An', 'Stylist'],
+    21403: ['Võ Quốc Trọng', 'Stylist'] };
   var NGUONG_SALE = 0.7;   // UDN/MP/Topup/Book hôm qua < 70% mức TB 14 ngày của chính người đó → ⚠️
   var NGUONG_BOOK = 0.8;   // tỉ lệ khách book được phục vụ < 80% (salon)
   var SO_NGAY = 14;
-  var S = '/0019_baocao-sale-v7/', C = '/0029-baocao-chatluong-salon/';
+  var S = '/0019_baocao-sale-v7/', C = '/0029-baocao-chatluong-salon/', R = '/0005_BaocaoChatluong/data/';
   var THU = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
 
   if (!/reports\.30shine\.com$/.test(location.hostname)) {
@@ -84,7 +85,10 @@
     daily(C, 'clsalon-book-stylist'),
     daily(C, 'clsalon-book-skinner'),
     get(C + 'clsalon-book-salon/clsalon-book-salon-' + HQ + '.json'),
-    firstOk(['/dim/dim-salon.json'])
+    firstOk(['/dim/dim-salon.json']),
+    get(S + 'sale-staff-day/sale-staff-day-' + HQ + '.json'),
+    get(R + 'rating-cldv-salon-' + HQ + '.json'),
+    get(R + 'rating-cldv-raw-salon-' + HQ + '.json')
   ]).then(function (res) {
     if (het) { txt.textContent = '❌ Phiên đăng nhập báo cáo đã hết. Tải lại trang, đăng nhập 30Shine rồi bấm dấu trang lại.'; return; }
     var info = {}, idByName = {};
@@ -98,6 +102,8 @@
     var udnType = {};
     res[2].forEach(function (r) { if (nfc(r.Nganh_hang) === '3.DV_UND') udnType[nfc(r.Type_new)] = 1; });
     var cat = res[3], topDays = res[4], bkSt = res[5], bkSk = res[6], bookSalon = res[7] || [];
+    var staffDay = res[9] || [], ratSalon = res[10] || [], ratRaw = res[11] || [];
+    function soSalon(t) { var m = String(t || '').match(/^\s*(\d+)/); return m ? m[1] : nfc(t).toLowerCase(); }
     var tenSalon = {};
     (res[8] || []).forEach(function (r) { var id = r.salon_id != null ? r.salon_id : r.Salon_ID; if (id != null) tenSalon[id] = r.salon_name || r.Salon_name; });
     var ids = {};
@@ -144,6 +150,10 @@
         });
       });
 
+      staffDay.forEach(function (r) {
+        if (sid(r) !== sal.id || r.staff_ID == null) return;
+        if (num(r.SL_khach_BI_staff) > 0 || num(r.DT_DV_staff) + num(r.DT_SP_staff) > 0) { cell(r.staff_ID, HQ); nv[r.staff_ID].lam = true; coSo = true; }
+      });
       L.push('🏠 ' + sal.ten);
       if (!coSo) { L.push('⚠️ Báo cáo chưa có số ngày ' + HQ.slice(8) + '/' + HQ.slice(5, 7) + '.', ''); return; }
 
@@ -158,7 +168,7 @@
           return nhan[key] + ' ' + (key === 'book' ? h[key] : fk(h[key])) + (low ? '⚠️' : '');
         });
         var nm = info[id] ? info[id].n : ('Mã ' + id);
-        return { s: '• ' + nm + ': ' + parts.join(' · '), canh: canh.length, di: keys.some(function (x) { return h[x] > 0; }) };
+        return { s: '• ' + nm + ': ' + parts.join(' · '), canh: canh.length, nm: nm, co: truoc.length > 0, di: o.lam || keys.some(function (x) { return h[x] > 0; }) };
       }
       function role(id) {
         var p = info[id] ? info[id].p.toLowerCase() : '';
@@ -168,11 +178,13 @@
       }
       [['st', '✂️ Stylist (UDN · MP · Book)', ['udn', 'mp', 'book']], ['sk', '💆 Skinner (MP · Topup · Book)', ['mp', 'topup', 'book']]].forEach(function (g) {
         var rows = Object.keys(nv).filter(function (id) { return role(id) === g[0]; })
-          .map(function (id) { return dong(id, g[2]); }).filter(function (r) { return r.di; })
-          .sort(function (a, b) { return b.canh - a.canh; });
+          .map(function (id) { return dong(id, g[2]); });
+        var vang = rows.filter(function (r) { return !r.di && r.co; }).map(function (r) { return r.nm; });
+        rows = rows.filter(function (r) { return r.di; }).sort(function (a, b) { return b.canh - a.canh; });
         L.push(g[1]);
         if (!rows.length) L.push('(không có số)');
         rows.forEach(function (r) { L.push(r.s); });
+        if (vang.length) L.push('  (không có số hôm qua – nghỉ hoặc làm salon khác: ' + vang.join(', ') + ')');
       });
 
       var b = bookSalon.filter(function (r) { return sid(r) === sal.id; }), tong = 0, den = 0;
@@ -181,6 +193,33 @@
         var tl = den / tong;
         L.push((tl < NGUONG_BOOK ? '📅 ⚠️ ' : '📅 ✓ ') + 'Khách book đến: ' + den + '/' + tong + ' (' + pct(tl) + ')' +
           (tl < NGUONG_BOOK ? ' – ' + (tong - den) + ' khách bỏ book' : ''));
+      }
+      // ---- Rating (báo cáo 0005, khoá theo tên salon) ----
+      var key = soSalon(sal.ten), sao = [0, 0, 0, 0, 0];
+      ratSalon.forEach(function (r) {
+        if (soSalon(r.salon_name) !== key) return;
+        for (var i = 1; i <= 5; i++) sao[i - 1] += num(r[i + '_sao']);
+      });
+      var bills = ratRaw.filter(function (r) { return soSalon(r.salon_name) === key; });
+      var tongR = sao.reduce(function (a, b) { return a + b; }, 0);
+      if (!tongR) bills.forEach(function (r) { var v = Math.round(num(r.rating)); if (v >= 1 && v <= 5) { sao[v - 1]++; tongR++; } });
+      var xau = bills.filter(function (r) { var v = num(r.rating); return v >= 1 && v <= 3; });
+      var soXau = sao[0] + sao[1] + sao[2];
+      if (!tongR && !bills.length) {
+        L.push('⭐ Rating: báo cáo chưa có số ngày này');
+      } else {
+        var tbR = tongR ? (sao[0] + 2 * sao[1] + 3 * sao[2] + 4 * sao[3] + 5 * sao[4]) / tongR : 0;
+        L.push((soXau ? '⭐ ⚠️ ' : '⭐ ✓ ') + 'Rating: ' + tongR + ' bill đánh giá · TB ' + tbR.toFixed(2).replace('.', ',') +
+          ' · 4 sao: ' + sao[3] + ' · 1-2-3 sao: ' + soXau);
+        xau.forEach(function (r) {
+          var nguoi = [];
+          Object.keys(r).forEach(function (k) {
+            if (/(stylist|skinner|staff).*(name|ten)|(name|ten).*(stylist|skinner|staff)/i.test(k) && r[k] && isNaN(r[k])) nguoi.push(nfc(r[k]));
+          });
+          var tag = nfc(r.Category_FB_name || r.FB_name), fb = nfc(r.FB_detail);
+          L.push('  • ' + num(r.rating) + '⭐' + (nguoi.length ? ' – ' + nguoi.join(', ') : '') +
+            (tag ? ' – ' + tag : '') + (fb ? ' – "' + fb.slice(0, 80) + '"' : ''));
+        });
       }
       L.push('');
     });
